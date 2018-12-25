@@ -8,9 +8,14 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "cos-js-sdk-v5": "^0.5.1",
+    "express": "^4.16.4",
+    "recorder-js": "^1.0.7",
+    "tencentcloud-sdk-nodejs": "^3.0.40",
     "vue": "^2.5.17",
     "vue-audio-recorder": "^3.0.1",
-    "vue-router": "^3.0.1"
+    "vue-router": "^3.0.1",
+    "ws": "^6.1.2"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.2.0",

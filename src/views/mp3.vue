@@ -1,8 +1,12 @@
 <template>
   <div class="home">
-      <audio v-for="(v, i) in arr" :key="i" :src="v" controls="controls">
-        Your browser does not support the audio element.
-      </audio>
+      <div v-for="(v, i) in arr" :key="i">
+          <audio :src="v" controls="controls">
+            Your browser does not support the audio element.
+        </audio>
+        <span v-if="showArr[i]">{{TxtArr[i]}}</span>
+        <button v-else @click="show(i)">转文字</button>
+      </div>
       <button @click="record">{{txt}}</button>
   </div>
 </template>
@@ -11,6 +15,7 @@
 // @ is an alias to /src
 // import HelloWorld from '@/components/HelloWorld.vue'
 import COS from 'cos-js-sdk-v5'
+import Recorder from 'recorder-js'
   var Bucket ='1-1256914858';
   var Region = 'ap-chengdu';
   var cos = new COS({
@@ -27,70 +32,63 @@ import COS from 'cos-js-sdk-v5'
         callback(authorization);
       }
   });
+// import mixins from './abc'
 export default {
   name: 'home',
   data () {
     return {
+      TxtArr:[],
+      showArr:[],
       arr: [],
       txt: '录制',
       recorder: '',
-      buffers: '',
-      ws: ''
+      ws: '',
+      type: 'url'
     }
   },
+//   mixins: [mixins],
   mounted () {
     let that = this
     this.ws = new WebSocket('wss://zhengpeng.xyz:8888')
-    // this.ws.onopen = () => {
-    //   this.ws.send('clear')
-    // }
     this.ws.addEventListener('open', function () {
-      console.log('23423423423423')
+    //   that.ws.send(that.a)
     });
     this.ws.onmessage = (msg) => {
-      that.arr.push(msg.data)
-    }
-    var promise = navigator.mediaDevices.getUserMedia({audio:true,vedio:true});
-    console.log('promise',promise)
-    promise.then(function(stream){
-        // that.recorder=new MediaRecorder(stream);//new MediaStreamRecorder(stream);
-        // that.recorder.mimeType = 'audio/ogg'; // audio/webm or audio/ogg or audio/wav
-        that.recorder=new MediaRecorder(stream);
-        console.log('stream',stream)
-        console.log('that.recorder',that.recorder)
-    that.recorder.ondataavailable=function(e){
-            console.log('e',e)
-            that.buffers=e.data;
+        console.log('msg',msg)
+        console.log('type',this.type)
+        let res = msg.data
+        if (this.type === 'url') {
+            that.arr.push(res)
+        }else{
+            that.TxtArr.push(res)
         }
-    that.recorder.onstop=function(){
-            // var url=URL.createObjectURL(that.buffers);
-            console.log(that.buffers);
-            // downloadButton.click();
-              let a = new FileReader();
-              a.onload = function (e) {
-                let name = Math.floor(Math.random(0,1)*100000)
-                that.dataURLtoFile(e.target.result, name,that)
-              }
-              a.readAsDataURL(that.buffers);
-            that.buffers=null;
-        };
-    }).catch(function(error){
-        console.log('error',error);
-     });
-  },
+    }
+    //
+    const audioContext =  new (window.AudioContext || window.webkitAudioContext)();
+ 
+    that.recorder = new Recorder(audioContext, {
+        // An array of 255 Numbers
+        // You can use this to visualize the audio stream
+        // If you use react, check out react-wave-stream
+        onAnalysed: data => {
+            // console.log(data)
+        },
+    });
+    navigator.mediaDevices.getUserMedia({audio: true})
+    .then(stream => {
+        console.log(stream)
+        that.recorder.init(stream)
+    })
+    .catch(err => console.log('Uh oh... unable to get stream...', err));
+    },
   components: {
     // HelloWorld
   },
   methods: {
-    callback (e) {
-      let that = this
-      // console.log(e);
-      let a = new FileReader();
-      a.onload = function (e) {
-        let name = Math.floor(Math.random(0,1)*100000)
-        that.dataURLtoFile(e.target.result, name,that)
-      }
-      a.readAsDataURL(e.blob);
+    show (i) {
+        this.type = 'txt'
+        this.$set(this.showArr, i, true)
+        this.ws.send(JSON.stringify({type: 1,url:this.arr[i]}))
     },
     dataURLtoFile(dataurl, filename, that) {//将base64转换为文件
         var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
@@ -107,24 +105,35 @@ export default {
           Key: 'mp3/'+file.name,
           Body: file,
           onProgress: function (progressData,callback) {
-            console.log(progressData);
+            // console.log(progressData);
             callback()
           },
         }, function(err, data) {
           console.log(err,data);
-          that.ws.send('https://'+data.Location)
-          // that.arr.push(data.Location)
+        //   that.ws.send('https://'+data.Location)
+          that.ws.send(JSON.stringify({"url":'https://'+data.Location}))
         });
     },
     record () {
+        this.type = 'url'
+        let that = this
       if (this.txt === '录制') {
         this.txt = '发送'
-        console.log(this.txt)
-        console.log('this.recorder',this.recorder)
         this.recorder.start()
       } else {
         this.txt = '录制'
-        this.recorder.stop()
+        that.recorder.stop()
+            .then(({blob, buffer}) => {
+                console.log(blob, buffer)
+                let a = new FileReader();
+                a.onload = function (e) {
+                    // console.log(e)
+                    let name = Math.floor(Math.random(0,1)*100000)+'.wav'
+                    that.dataURLtoFile(e.target.result, name,that)
+                }
+                a.readAsDataURL(blob);
+                // buffer is an AudioBuffer
+            })
       }
     }
   },
